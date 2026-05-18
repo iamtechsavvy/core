@@ -1,0 +1,14 @@
+.github/*.md
+.history
+CORE.app/
+CORE.dmg
+.idea
+.vscode
+*.log
+*.tmp
+node_modules
+dist
+build
+memory-bank/**
+openspec/**
+release-builds/**
