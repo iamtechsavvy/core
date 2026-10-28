@@ -81,15 +81,22 @@ cp "$SCRIPT" "$APP/Contents/Resources/outlook-reminder-center.sh"
 chmod +x "$APP/Contents/Resources/outlook-reminder-center.sh"
 cp "$DIR/ABOUT.md"   "$APP/Contents/Resources/ABOUT.md"
 echo "▶ Installing to /Applications…"
-pkill -f "CORE" 2>/dev/null || true
+pkill -x CORE 2>/dev/null || true
+rm -rf "/Applications/CORE.app" 2>/dev/null || true
 if cp -rf "$APP" "/Applications/" 2>/dev/null; then
     echo "   Installed: /Applications/CORE.app"
 else
     echo "   Needs admin rights — requesting password…"
-    osascript -e "do shell script \"cp -rf '${APP}' '/Applications/'\" \
-        with administrator privileges" \
-        && echo "   Installed: /Applications/CORE.app" \
-        || echo "   ⚠ Skipped /Applications install (cancelled or denied)"
+    if osascript - "$APP" <<'ADMIN_AS'
+on run argv
+    do shell script "rm -rf /Applications/CORE.app && cp -rf " & quoted form of (item 1 of argv) & " /Applications/" with administrator privileges
+end run
+ADMIN_AS
+    then
+        echo "   Installed: /Applications/CORE.app"
+    else
+        echo "   ⚠ Skipped /Applications install (cancelled or denied)"
+    fi
 fi
 
 # ── 7. Build DMG with drag-to-install Applications symlink ───────────────────

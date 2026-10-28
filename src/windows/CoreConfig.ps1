@@ -68,6 +68,7 @@ function Get-CoreConfig {
 
     Assert-InRange -Value $config.Interval -Min 1 -Max 300 -Name 'Interval'
     Assert-InRange -Value $config.LeadTimeMinutes -Min 0 -Max 30 -Name 'LeadTimeMinutes'
+    Assert-InRange -Value $config.Debug -Min 0 -Max 1 -Name 'Debug'
     Assert-InRange -Value $config.MaxErrors -Min 1 -Max 100 -Name 'MaxErrors'
 
     [PSCustomObject]@{

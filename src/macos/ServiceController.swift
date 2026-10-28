@@ -46,47 +46,33 @@ final class ServiceController: ServiceControlling {
                      """)) ?? 2
         }
 
-        func writePlist(script: String, interval: Int, debug: Bool, imminentMinutes: Int) {
-        let py = """
-import plistlib, os, pathlib
-p = os.environ['ORC_PLIST']
-pathlib.Path(p).parent.mkdir(parents=True, exist_ok=True)
-pathlib.Path(os.environ['ORC_LOG']).mkdir(parents=True, exist_ok=True)
-d = {
-  'Label': os.environ['ORC_LABEL'],
-  'ProgramArguments': ['/bin/bash', os.environ['ORC_SCRIPT']],
-  'EnvironmentVariables': {
-    'OUTLOOK_CHECK_INTERVAL': os.environ['ORC_INTERVAL'],
-        'OUTLOOK_IMMINENT_MINUTES': os.environ['ORC_IMMINENT_MINUTES'],
-    'OUTLOOK_DEBUG':          os.environ['ORC_DEBUG'],
-  },
-  'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 10,
-  'StandardOutPath':  os.environ['ORC_LOG'] + 'stdout.log',
-  'StandardErrorPath':os.environ['ORC_LOG'] + 'stderr.log',
-  'ProcessType': 'Background',
-}
-open(p, 'wb').write(plistlib.dumps(d, fmt=plistlib.FMT_XML))
-"""
-        let tmpPy = FileManager.default.temporaryDirectory
-            .appendingPathComponent("orc_pw_\(ProcessInfo.processInfo.processIdentifier).py").path
-        try? py.write(toFile: tmpPy, atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(atPath: tmpPy) }
-
-        var env = ProcessInfo.processInfo.environment
-        env["ORC_LABEL"] = AppConfig.label
-        env["ORC_SCRIPT"] = script
-        env["ORC_INTERVAL"] = "\(interval)"
-        env["ORC_IMMINENT_MINUTES"] = "\(imminentMinutes)"
-        env["ORC_DEBUG"] = debug ? "1" : "0"
-        env["ORC_PLIST"] = AppConfig.plistPath
-        env["ORC_LOG"] = AppConfig.logDir
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        task.arguments = [tmpPy]
-        task.environment = env
-        try? task.run()
-        task.waitUntilExit()
+    func writePlist(script: String, interval: Int, debug: Bool, imminentMinutes: Int) -> Bool {
+        let plist: [String: Any] = [
+            "Label": AppConfig.label,
+            "ProgramArguments": ["/bin/bash", script],
+            "EnvironmentVariables": [
+                "OUTLOOK_CHECK_INTERVAL": "\(interval)",
+                "OUTLOOK_IMMINENT_MINUTES": "\(imminentMinutes)",
+                "OUTLOOK_DEBUG": debug ? "1" : "0",
+            ],
+            "RunAtLoad": true,
+            "KeepAlive": true,
+            "ThrottleInterval": 10,
+            "StandardOutPath": AppConfig.logDir + "stdout.log",
+            "StandardErrorPath": AppConfig.logDir + "stderr.log",
+            "ProcessType": "Background",
+        ]
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(atPath: (AppConfig.plistPath as NSString).deletingLastPathComponent,
+                                   withIntermediateDirectories: true)
+            try fm.createDirectory(atPath: AppConfig.logDir, withIntermediateDirectories: true)
+            let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            try data.write(to: URL(fileURLWithPath: AppConfig.plistPath), options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     func findScript() -> String? {
@@ -100,7 +86,7 @@ open(p, 'wb').write(plistlib.dumps(d, fmt=plistlib.FMT_XML))
     }
 
     func loadDaemon() {
-        sh("launchctl load '\(AppConfig.plistPath)'")
+        run("/bin/launchctl", ["load", AppConfig.plistPath])
     }
 
     func stopDaemon() {
@@ -112,7 +98,7 @@ open(p, 'wb').write(plistlib.dumps(d, fmt=plistlib.FMT_XML))
     }
 
     func uninstallDaemon() {
-        sh("rm -f '\(AppConfig.plistPath)'")
+        try? FileManager.default.removeItem(atPath: AppConfig.plistPath)
         let uid = sh("id -u")
         sh("launchctl bootout gui/\(uid)/\(AppConfig.label) 2>/dev/null; true")
         sh("launchctl unload '\(AppConfig.plistPath)' 2>/dev/null; true")

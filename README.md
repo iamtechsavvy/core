@@ -77,7 +77,7 @@ Requires Xcode command-line tools (`xcode-select --install`).
 bash build.sh
 ```
 
-This compiles the app, installs it to `/Applications`, and creates `CORE.dmg`.
+This compiles the app, **replaces `/Applications/CORE.app`** (it may ask for your admin password if needed), and creates `CORE.dmg`.
 
 ## Troubleshooting
 

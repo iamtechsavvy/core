@@ -279,7 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard value != -1 else { return }
 
         guard let script = scriptPath ?? service.findScript() else {
-            alert("Script Not Found", "Place outlook-reminder-center.sh in the same folder as the .app.")
+            alert("Script Not Found", "The bundled service script is missing. Please reinstall CORE.")
             return
         }
 
@@ -292,12 +292,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runStopDaemon { [weak self] in
             guard let self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                self.service.writePlist(
+                guard self.service.writePlist(
                     script: script,
                     interval: value,
                     debug: debugEnabled,
                     imminentMinutes: imminentMinutes
-                )
+                ) else {
+                    DispatchQueue.main.async { self.alert("Update Failed", "Could not write the service configuration.") }
+                    return
+                }
                 self.service.loadDaemon()
                 DispatchQueue.main.async {
                     self.refreshStatus()
@@ -316,7 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard value != -1 else { return }
 
         guard let script = scriptPath ?? service.findScript() else {
-            alert("Script Not Found", "Place outlook-reminder-center.sh in the same folder as the .app.")
+            alert("Script Not Found", "The bundled service script is missing. Please reinstall CORE.")
             return
         }
 
@@ -330,12 +333,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runStopDaemon { [weak self] in
             guard let self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                self.service.writePlist(
+                guard self.service.writePlist(
                     script: script,
                     interval: interval,
                     debug: debugEnabled,
                     imminentMinutes: value
-                )
+                ) else {
+                    DispatchQueue.main.async { self.alert("Update Failed", "Could not write the service configuration.") }
+                    return
+                }
                 self.service.loadDaemon()
                 DispatchQueue.main.async {
                     self.refreshStatus()
@@ -346,7 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func install() {
         guard let script = scriptPath ?? service.findScript() else {
-            alert("Script Not Found", "Place outlook-reminder-center.sh in the same folder as the .app.")
+            alert("Script Not Found", "The bundled service script is missing. Please reinstall CORE.")
             return
         }
 
@@ -356,16 +362,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let installWork = { [weak self] in
             guard let self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                sh("chmod +x '\(script)'")
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script)
                 let imminentMinutes = self.service.isInstalled() ? self.service.getImminentMinutes() : 2
-                self.service.writePlist(
+                guard self.service.writePlist(
                     script: script,
                     interval: value,
                     debug: false,
                     imminentMinutes: imminentMinutes
-                )
+                ) else {
+                    DispatchQueue.main.async { self.alert("Update Failed", "Could not write the service configuration.") }
+                    return
+                }
                 self.service.loadDaemon()
-                sh("osascript -e 'display notification \"Running - checking every \(value)s\" with title \"CORE\" subtitle \"Service started\"'")
+                run("/usr/bin/osascript", ["-e", "display notification \"Running - checking every \(value)s\" with title \"CORE\" subtitle \"Service started\""])
                 DispatchQueue.main.async {
                     self.refreshStatus()
                     self.alert(
@@ -407,7 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openLogs() {
-        sh("mkdir -p '\(AppConfig.logDir)'")
+        try? FileManager.default.createDirectory(atPath: AppConfig.logDir, withIntermediateDirectories: true)
         NSWorkspace.shared.open(URL(fileURLWithPath: AppConfig.logDir))
     }
 
@@ -422,7 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func rotateLogs() {
-        sh("mkdir -p '\(AppConfig.logDir)'")
+        try? FileManager.default.createDirectory(atPath: AppConfig.logDir, withIntermediateDirectories: true)
         for file in AppConfig.logFiles {
             let path = AppConfig.logDir + file
             if FileManager.default.fileExists(atPath: path) {

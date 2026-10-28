@@ -6,7 +6,7 @@ protocol ServiceControlling {
     func getInterval() -> Int
     func getDebug() -> Bool
     func getImminentMinutes() -> Int
-    func writePlist(script: String, interval: Int, debug: Bool, imminentMinutes: Int)
+    func writePlist(script: String, interval: Int, debug: Bool, imminentMinutes: Int) -> Bool
     func findScript() -> String?
     func loadDaemon()
     func stopDaemon()

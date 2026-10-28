@@ -17,3 +17,16 @@ func sh(_ cmd: String) -> String {
     return String(data: data, encoding: .utf8)?
         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 }
+
+/// Runs an executable directly (no shell), so arguments are never re-parsed.
+@discardableResult
+func run(_ executable: String, _ args: [String]) -> Int32 {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: executable)
+    task.arguments = args
+    task.standardOutput = Pipe()
+    task.standardError = Pipe()
+    do { try task.run() } catch { return -1 }
+    task.waitUntilExit()
+    return task.terminationStatus
+}

@@ -13,6 +13,7 @@
 #   bash outlook-reminder-center.sh uninstall # remove the LaunchAgent
 
 set -euo pipefail
+umask 077   # logs may contain meeting titles; keep them private
 
 LABEL="com.core-reminder"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
@@ -33,7 +34,7 @@ if [[ "${1:-}" == "install" ]]; then
     pids=$(pgrep -f "$(basename "$SCRIPT")" 2>/dev/null | grep -v "^$$\$" || true)
     if [[ -n "$pids" ]]; then
         echo "Killing running process(es): $pids"
-        kill $pids 2>/dev/null || true
+        printf '%s\n' "$pids" | xargs kill 2>/dev/null || true
     fi
 
     # Conditionally include EnvironmentVariables block for debug mode
@@ -47,6 +48,9 @@ if [[ "${1:-}" == "install" ]]; then
     </dict>"
     fi
 
+    xml_escape() { local t="$1"; t="${t//&/&amp;}"; t="${t//</&lt;}"; echo "${t//>/&gt;}"; }
+    SCRIPT_XML="$(xml_escape "$SCRIPT")"; LOG_DIR_XML="$(xml_escape "$LOG_DIR")"
+
     cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -59,7 +63,7 @@ if [[ "${1:-}" == "install" ]]; then
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>${SCRIPT}</string>
+        <string>${SCRIPT_XML}</string>
     </array>
 ${ENV_BLOCK}
     <!-- Start at login -->
@@ -75,9 +79,9 @@ ${ENV_BLOCK}
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>${LOG_DIR}/stdout.log</string>
+    <string>${LOG_DIR_XML}/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>${LOG_DIR}/stderr.log</string>
+    <string>${LOG_DIR_XML}/stderr.log</string>
 
     <key>ProcessType</key>
     <string>Background</string>
@@ -157,7 +161,7 @@ if [[ "${1:-}" == "uninstall" ]]; then
     pids=$(pgrep -f "$(basename "$SCRIPT")" 2>/dev/null | grep -v "^$$\$" || true)
     if [[ -n "$pids" ]]; then
         echo "Stopping running process(es): $pids"
-        kill $pids 2>/dev/null || true
+        printf '%s\n' "$pids" | xargs kill 2>/dev/null || true
     fi
 
     echo "Done. The agent has been stopped and will no longer start at login."
@@ -179,10 +183,25 @@ MAX_ERRORS=${OUTLOOK_MAX_ERRORS:-10}
 
 # Set to 1 to enable debug logging, 0 to disable.
 DEBUG=${OUTLOOK_DEBUG:-0}
+
+# Settings come from the environment (the LaunchAgent plist): validate them.
+clamp() {  # clamp <value> <min> <max> <default>
+    local v="$1"
+    [[ "$v" =~ ^[0-9]{1,6}$ ]] || { echo "$4"; return; }
+    v=$((10#$v))
+    (( v < $2 )) && v=$2
+    (( v > $3 )) && v=$3
+    echo "$v"
+}
+CHECK_INTERVAL=$(clamp "$CHECK_INTERVAL" 1 300 10)
+IMMINENT_MINUTES=$(clamp "$IMMINENT_MINUTES" 0 30 2)
+MAX_ERRORS=$(clamp "$MAX_ERRORS" 1 100 10)
+[[ "$DEBUG" == "1" ]] || DEBUG=0
 # ──────────────────────────────────────────────────────────────────────────────
 consecutive_errors=0
 DEBUG_LOG="$LOG_DIR/debug.log"
 mkdir -p "$LOG_DIR"
+chmod 700 "$LOG_DIR" 2>/dev/null || true
 
 log() { [[ "$DEBUG" == "1" ]] || return 0; echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$DEBUG_LOG"; }
 
@@ -313,9 +332,9 @@ NOTIFY_JS
             log "[debug] window text (no match): $title"
             continue
         fi
-        local lock="$CENTER_DIR/$winId"
-        # winId and lock contents come from outside this script: accept digits only.
+        # winId comes from outside this script: allow only safe filename characters.
         [[ "$winId" =~ ^[A-Za-z0-9:_-]+$ ]] || continue
+        local lock="$CENTER_DIR/$winId"
         local last=0; [[ -f "$lock" ]] && last=$(cat "$lock")
         [[ "$last" =~ ^[0-9]+$ ]] || last=0
         # Notify once per window per 5 minutes
