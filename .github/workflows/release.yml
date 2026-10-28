@@ -1,0 +1,29 @@
+name: Release
+
+# Push a tag like v1.0.0 to build CORE.dmg and publish it as a GitHub Release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Production-readiness checks
+        run: bash scripts/prod-ready-check.sh
+      - name: Build DMG
+        run: VERSION="${GITHUB_REF_NAME#v}" SKIP_INSTALL=1 bash build.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" CORE.dmg CORE.dmg.sha256 \
+            --title "CORE $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "**Unsigned app.** CORE is not signed or notarized by Apple. After installing, right-click CORE → Open, or System Settings → Privacy & Security → Open Anyway. See the README for details. Free for personal, non-commercial use; see LICENSE."

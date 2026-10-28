@@ -2,6 +2,9 @@
 # build.sh — compiles Swift → .app, installs to /Applications, creates DMG
 set -euo pipefail
 
+VERSION="${VERSION:-1.0}"          # e.g. VERSION=1.2.0 bash build.sh
+SKIP_INSTALL="${SKIP_INSTALL:-0}"  # SKIP_INSTALL=1 to build without touching /Applications (used by CI)
+
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APP="$DIR/CORE.app"
 DMG="$DIR/CORE.dmg"
@@ -31,11 +34,17 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 
-swiftc "$SRC_DIR"/shared/*.swift "$SRC_DIR"/macos/*.swift \
-  -o "$BINARY" \
-  -framework Cocoa \
-  -framework Foundation \
-  2>&1
+# Universal binary (Apple Silicon + Intel).
+for ARCH in arm64 x86_64; do
+  swiftc "$SRC_DIR"/shared/*.swift "$SRC_DIR"/macos/*.swift \
+    -target "$ARCH-apple-macos12.0" \
+    -o "$BINARY.$ARCH" \
+    -framework Cocoa \
+    -framework Foundation \
+    2>&1
+done
+lipo -create "$BINARY.arm64" "$BINARY.x86_64" -output "$BINARY"
+rm -f "$BINARY.arm64" "$BINARY.x86_64"
 
 # ── 3. Bundle icon ────────────────────────────────────────────────────────────
 cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
@@ -53,9 +62,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key>
     <string>com.core-reminder.menubar</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>__VERSION__</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>__VERSION__</string>
     <key>CFBundleExecutable</key>
     <string>CORE</string>
     <key>CFBundlePackageType</key>
@@ -72,6 +81,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+sed -i '' "s/__VERSION__/$VERSION/g" "$APP/Contents/Info.plist"
+
 echo "▶ Writing PkgInfo…"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
@@ -80,6 +91,12 @@ echo "▶ Embedding shell script in bundle…"
 cp "$SCRIPT" "$APP/Contents/Resources/outlook-reminder-center.sh"
 chmod +x "$APP/Contents/Resources/outlook-reminder-center.sh"
 cp "$DIR/ABOUT.md"   "$APP/Contents/Resources/ABOUT.md"
+echo "▶ Ad-hoc signing (not a Developer ID signature)…"
+codesign --force --deep --sign - "$APP"
+
+if [[ "$SKIP_INSTALL" == "1" ]]; then
+    echo "▶ Skipping /Applications install (SKIP_INSTALL=1)"
+else
 echo "▶ Installing to /Applications…"
 pkill -x CORE 2>/dev/null || true
 rm -rf "/Applications/CORE.app" 2>/dev/null || true
@@ -98,6 +115,7 @@ ADMIN_AS
         echo "   ⚠ Skipped /Applications install (cancelled or denied)"
     fi
 fi
+fi
 
 # ── 7. Build DMG with drag-to-install Applications symlink ───────────────────
 echo "▶ Building DMG…"
@@ -113,11 +131,13 @@ hdiutil create \
   -format UDZO \
   "$DMG"
 
+(cd "$DIR" && shasum -a 256 "$(basename "$DMG")" > "$DMG.sha256")
+
 echo "▶ Publishing release artifacts…"
 mkdir -p "$RELEASE_DIR"
 rm -rf "$RELEASE_DIR/CORE.app"
 cp -R "$APP" "$RELEASE_DIR/CORE.app"
-cp -f "$DMG" "$RELEASE_DIR/CORE.dmg"
+cp -f "$DMG" "$DMG.sha256" "$RELEASE_DIR/"
 
 echo ""
 echo "✅  Done:"
