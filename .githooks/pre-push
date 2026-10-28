@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs the production-readiness checks before every push.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass in an emergency: git push --no-verify  (CI will still run the checks)
+exec bash "$(git rev-parse --show-toplevel)/scripts/prod-ready-check.sh"

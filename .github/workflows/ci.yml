@@ -10,11 +10,15 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Bash syntax
         run: bash -n src/macos/outlook-reminder-center.sh && bash -n build.sh
       - name: ShellCheck
         run: |
           brew install shellcheck
           shellcheck src/macos/outlook-reminder-center.sh build.sh
+      - name: Production-readiness checks
+        run: bash scripts/prod-ready-check.sh
       - name: Swift typecheck
         run: swiftc -typecheck src/shared/*.swift src/macos/*.swift
