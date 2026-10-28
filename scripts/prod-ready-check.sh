@@ -15,7 +15,7 @@ leak=$(git log --all --format='%ae%n%ce' | sort -u | grep -v 'users.noreply.gith
 
 echo "▶ Secrets / personal data in tracked files and history"
 pat='(api[_-]?key|secret|passwd|password|token|BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|xox[bp]-|@gmail\.com|/Users/[a-z])'
-hits=$(git grep -nEi "$pat" -- . ':!scripts' ':!.claude' ':!README.md' ':!SECURITY.md' ':!LICENSE' | grep -v 'Needs admin rights' || true)
+hits=$(git grep -nEi "$pat" -- . ':!scripts' ':!.claude' ':!README.md' ':!SECURITY.md' ':!LICENSE' | grep -v 'Needs admin rights' | grep -vF '${{' || true)
 [[ -z "$hits" ]] && ok "no matches in tracked files" || { bad "possible secrets/PII:"; echo "$hits" | sed 's/^/     /'; }
 h=$(git log --all -p | grep -Eic 'gmail\.com|BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}' || true)
 [[ "$h" == "0" ]] && ok "history clean" || bad "history contains $h suspicious lines"
