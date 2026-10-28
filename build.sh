@@ -94,15 +94,15 @@ fi
 
 # ── 7. Build DMG with drag-to-install Applications symlink ───────────────────
 echo "▶ Building DMG…"
-rm -rf /tmp/orc-dmg-staging
-mkdir -p /tmp/orc-dmg-staging
-cp -r "$APP"    /tmp/orc-dmg-staging/
-ln -s /Applications /tmp/orc-dmg-staging/Applications
+STAGING="$(mktemp -d)"
+trap 'rm -rf "$STAGING"' EXIT
+cp -r "$APP"    "$STAGING/"
+ln -s /Applications "$STAGING/Applications"
 
 rm -f "$DMG"
 hdiutil create \
   -volname "CORE" \
-  -srcfolder /tmp/orc-dmg-staging \
+  -srcfolder "$STAGING" \
   -format UDZO \
   "$DMG"
 

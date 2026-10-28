@@ -94,16 +94,9 @@ open(p, 'wb').write(plistlib.dumps(d, fmt=plistlib.FMT_XML))
             return bundled
         }
 
-        let appDir = URL(fileURLWithPath: Bundle.main.bundlePath)
-            .deletingLastPathComponent().path
-
-        let candidates = [
-            appDir + "/outlook-reminder-center.sh",
-            AppConfig.home + "/workspace/outlook-reminder-center/src/macos/outlook-reminder-center.sh",
-            AppConfig.home + "/src/macos/outlook-reminder-center.sh"
-        ]
-
-        return candidates.first { FileManager.default.fileExists(atPath: $0) }
+        // Only run the script bundled inside the app; never fall back to
+        // arbitrary locations that could be swapped out and run at login.
+        return nil
     }
 
     func loadDaemon() {

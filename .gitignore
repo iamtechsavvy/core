@@ -12,3 +12,4 @@ build
 memory-bank/**
 openspec/**
 release-builds/**
+.DS_Store

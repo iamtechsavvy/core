@@ -188,8 +188,10 @@ log() { [[ "$DEBUG" == "1" ]] || return 0; echo "[$(date '+%Y-%m-%d %H:%M:%S')] 
 
 # Centers and notifies for any reminder window showing "Now" or within configured minutes.
 # Runs in a subshell so failures never affect the main loop.
-CENTER_DIR="/tmp/core-reminder-centered"
+# Private per-user directory (not world-writable /tmp) to avoid tampering.
+CENTER_DIR="$HOME/Library/Caches/CORE/centered"
 mkdir -p "$CENTER_DIR"
+chmod 700 "$CENTER_DIR" "$(dirname "$CENTER_DIR")" 2>/dev/null || true
 
 check_imminent() {
     local now; now=$(date +%s)
@@ -312,16 +314,23 @@ NOTIFY_JS
             continue
         fi
         local lock="$CENTER_DIR/$winId"
+        # winId and lock contents come from outside this script: accept digits only.
+        [[ "$winId" =~ ^[A-Za-z0-9:_-]+$ ]] || continue
         local last=0; [[ -f "$lock" ]] && last=$(cat "$lock")
+        [[ "$last" =~ ^[0-9]+$ ]] || last=0
         # Notify once per window per 5 minutes
         if (( now - last >= 300 )); then
             log "[alert] IMMINENT — centered: $title (win $winId)"
             echo "$now" > "$lock"
-            if (( IMMINENT_MINUTES == 0 )); then
-                osascript -e "display notification \"Meeting starting now\" with title \"\u23f0 CORE\" subtitle \"$title\"" || true
-            else
-                osascript -e "display notification \"Meeting starting in ${IMMINENT_MINUTES} minutes or less\" with title \"\u23f0 CORE\" subtitle \"$title\"" || true
-            fi
+            local body="Meeting starting now"
+            (( IMMINENT_MINUTES == 0 )) || body="Meeting starting in ${IMMINENT_MINUTES} minutes or less"
+            # Title is attacker-controlled (meeting subject): pass it as an argv
+            # item, never interpolate it into AppleScript source.
+            osascript - "$body" "$title" <<'NOTIFY_AS' || true
+on run argv
+    display notification (item 1 of argv) with title "CORE" subtitle (item 2 of argv)
+end run
+NOTIFY_AS
         fi
     done <<< "$result"
 }
