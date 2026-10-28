@@ -12,7 +12,7 @@ CORE is **not signed or notarized by Apple**, because that requires a paid Apple
 
 To open it:
 
-1. Download `CORE.dmg`, open it, and drag **CORE** into **Applications**.
+1. Download `CORE.dmg` from the [latest release](../../releases/latest) (no need to clone or build anything), open it, and drag **CORE** into **Applications**. Optionally verify it: `shasum -a 256 -c CORE.dmg.sha256` (download the `.sha256` file next to the DMG).
 2. In Applications, **right-click (or Control-click) CORE → Open**, then click **Open** in the dialog.
 3. If macOS still blocks it: **System Settings → Privacy & Security**, scroll to the message about CORE and click **Open Anyway**.
 4. If the app is reported as "damaged" after download, clear the quarantine flag:
@@ -20,7 +20,7 @@ To open it:
    xattr -dr com.apple.quarantine /Applications/CORE.app
    ```
 
-Prefer to avoid unsigned binaries entirely? Build it yourself from source (see below).
+The DMG is a universal build (Apple Silicon and Intel) for macOS 12 or newer. Prefer to avoid unsigned binaries entirely? Build it yourself from source (see below).
 
 ---
 
