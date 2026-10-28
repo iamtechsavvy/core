@@ -1,5 +1,7 @@
 # Windows Runtime
 
+> **Unsupported / experimental.** CORE is not meant for Windows — Windows already provides this behaviour. These scripts are an untested preview, are not part of the release, and may be removed.
+
 Windows-specific runtime implementation for CORE.
 
 ## Scripts
@@ -17,7 +19,7 @@ Config is stored at `%APPDATA%\CORE\config.json`.
 
 - `Interval` range: 1 to 300 seconds
 - `LeadTimeMinutes` range: 0 to 30 minutes (`0` = Now only)
-- `Debug` range: 0 or 1
+- `-DebugLogging` range: 0 or 1
 
 ## Quick Start (Windows)
 

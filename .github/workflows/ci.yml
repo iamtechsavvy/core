@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: bash -n src/macos/outlook-reminder-center.sh && bash -n build.sh
+      - name: ShellCheck
+        run: |
+          brew install shellcheck
+          shellcheck src/macos/outlook-reminder-center.sh build.sh
+      - name: Swift typecheck
+        run: swiftc -typecheck src/shared/*.swift src/macos/*.swift

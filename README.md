@@ -1,297 +1,104 @@
 # CORE — Center Outlook Reminders
 
-Automatically snaps Microsoft Outlook reminder popups to the centre of your screen when they appear with 2 minutes or less until a meeting. Works across multiple monitors. Zero dependencies — requires only bash and osascript (built into macOS).
+CORE is a small macOS menu-bar app that watches for Microsoft Outlook meeting reminders and moves the popup to the centre of your screen when a meeting is starting (or about to), so it can't hide behind other windows. It works across multiple monitors and has no dependencies.
 
-Windows runtime support is available via scripts under `src/windows/`.
+> **Windows is not a target.** Windows already has this behaviour built in. The scripts under `src/windows/` are an unsupported, experimental preview and are not part of the release.
 
 ---
 
-## Windows (Preview)
+## ⚠️ Unsigned app — you must approve it to open it
 
-### Requirements
+CORE is **not signed or notarized by Apple**, because that requires a paid Apple Developer account. macOS Gatekeeper will therefore warn you the first time you open it. This is expected. Only install CORE if you got it from this repository, and you can read the full source here before running it.
 
-- Windows 10 or newer
-- Microsoft Outlook installed
-- PowerShell 5.1+ (or PowerShell 7)
+To open it:
 
-### Setup
+1. Download `CORE.dmg`, open it, and drag **CORE** into **Applications**.
+2. In Applications, **right-click (or Control-click) CORE → Open**, then click **Open** in the dialog.
+3. If macOS still blocks it: **System Settings → Privacy & Security**, scroll to the message about CORE and click **Open Anyway**.
+4. If the app is reported as "damaged" after download, clear the quarantine flag:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/CORE.app
+   ```
 
-```powershell
-cd src\windows
-powershell -ExecutionPolicy Bypass -File .\set-config.ps1 -Interval 10 -LeadTimeMinutes 2
-powershell -ExecutionPolicy Bypass -File .\install-startup.ps1
-```
-
-### Run / Status
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\outlook-reminder-center.ps1
-powershell -ExecutionPolicy Bypass -File .\status.ps1
-```
-
-### Logs
-
-- `%APPDATA%\CORE\logs\debug.log`
-- `%APPDATA%\CORE\logs\error.log`
+Prefer to avoid unsigned binaries entirely? Build it yourself from source (see below).
 
 ---
 
 ## Requirements
 
-- macOS (any recent version)
-- Microsoft Outlook installed
-- **Accessibility permission** granted to Terminal (or whichever app runs the script)
-  - System Settings → Privacy & Security → Accessibility → enable Terminal (or your terminal app)
-- **Notifications permission** for `osascript`
-  - System Settings → Notifications → Script Editor / osascript → Allow Notifications
+- macOS 12 or newer
+- Microsoft Outlook for Mac
+- **Accessibility permission** for CORE: System Settings → Privacy & Security → Accessibility
+- **Notifications permission**: System Settings → Notifications
 
----
+## Using CORE
 
-## Setup
+Launch CORE; a **CORE** item appears in the menu bar. From the menu you can:
 
-### 1. Download
-
-Save `outlook-reminder-center.sh` to a permanent folder on your Mac. It must stay there — the LaunchAgent plist points to it directly.
-
-```
-~/scripts/outlook-reminder-center.sh   ← recommended location
-```
-
-### 2. Install
-
-```bash
-cd ~/scripts   # or wherever you saved the file
-bash outlook-reminder-center.sh install
-```
-
-The script will:
-- Make itself executable
-- Write a LaunchAgent plist to `~/Library/LaunchAgents/com.outlook-reminder-center.plist`
-- Load the agent — it starts immediately and restarts automatically at every login
-
-### 3. Verify it is running
-
-```bash
-launchctl list | grep outlook-reminder-center
-```
-
-A PID in the first column means it is actively running. A `-` means it is registered but not running.
-
----
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `bash outlook-reminder-center.sh install` | Install as a macOS LaunchAgent (debug logging off) |
-| `bash outlook-reminder-center.sh install --debug` | Install with debug logging enabled |
-| `bash outlook-reminder-center.sh uninstall` | Stop the agent, remove the plist, kill any running processes |
-| `bash outlook-reminder-center.sh status` | Show agent status, running processes, recent logs |
-| `bash outlook-reminder-center.sh` | Run in the foreground (Ctrl-C to stop) |
-
-> **Re-installing** automatically stops and kills any existing instance first, so there is no need to uninstall before reinstalling.
-
-### Manual start / stop without reinstalling
-
-```bash
-# Stop
-launchctl unload ~/Library/LaunchAgents/com.outlook-reminder-center.plist
-
-# Start
-launchctl load ~/Library/LaunchAgents/com.outlook-reminder-center.plist
-
-# Restart (pick up code changes without reinstalling)
-launchctl kickstart -k gui/$(id -u)/com.outlook-reminder-center
-```
-
-### Check what is running
-
-```bash
-# Full status summary (recommended)
-bash outlook-reminder-center.sh status
-
-# Just the LaunchAgent registration
-launchctl list | grep outlook-reminder-center
-
-# All your user LaunchAgents
-launchctl list | grep -v com.apple
-
-# Running processes
-pgrep -fl outlook-reminder-center.sh
-
-# View the installed plist
-cat ~/Library/LaunchAgents/com.outlook-reminder-center.plist
-```
-
-### Watch logs live
-
-```bash
-# Debug events (only written when installed with --debug)
-tail -f ~/Library/Logs/OutlookReminderCenter/debug.log
-
-# Errors
-tail -f ~/Library/Logs/OutlookReminderCenter/stderr.log
-
-# Standard output
-tail -f ~/Library/Logs/OutlookReminderCenter/stdout.log
-```
-
----
+- install / start / stop / uninstall the background service (a per-user LaunchAgent that starts at login)
+- **Change Check Interval** — how often reminders are checked (1–300 s, default 10)
+- **Change Reminder Lead Time** — 0 = "Now" only, up to 30 minutes (default 2)
+- open the log folder
 
 ## How it works
 
-Every `CHECK_INTERVAL` seconds (default: 10s) the daemon reads the text inside each Outlook "Reminder" window using the macOS Accessibility API. If any entry shows `Now` or `0–2 min`, it:
+Every check interval the service reads the text of each Outlook "Reminder" window through the macOS Accessibility API. If a reminder shows "Now" or a time within your lead time, CORE centres that window on the screen it is on, sends a notification, and applies a 5-minute per-window cooldown. Nothing is touched when no meeting is imminent.
 
-- Centers the window on whichever screen it is on
-- Fires a macOS native notification ("Meeting starting in 2 minutes or less")
-- Applies a per-window 5-minute cooldown to prevent repeated alerts for the same event
+## Privacy and security
 
-Multi-monitor support: the script calculates which screen has the most overlap with the window and centers it on that screen.
+- CORE makes no network connections and collects no data.
+- It only reads Outlook reminder window text locally, to decide whether to centre it.
+- With **debug logging** enabled, reminder window text (including meeting titles) is written to `~/Library/Logs/CORE/debug.log`. Leave it off unless troubleshooting.
+- Report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
 
-The window is only touched when a meeting is imminent — if nothing is urgent, no action is taken.
+## Files CORE creates
 
----
+| Path | Purpose |
+|---|---|
+| `~/Library/LaunchAgents/com.core-reminder.plist` | LaunchAgent (start at login) |
+| `~/Library/Logs/CORE/` | `stdout.log`, `stderr.log`, `debug.log` |
+| `~/Library/Caches/CORE/centered/` | Per-window cooldown markers |
 
-## Configuration
+## Uninstall
+
+Use **Uninstall** from the CORE menu, then delete `/Applications/CORE.app`. To remove leftovers manually:
+
+```bash
+launchctl bootout gui/$(id -u)/com.core-reminder 2>/dev/null
+rm -f ~/Library/LaunchAgents/com.core-reminder.plist
+rm -rf ~/Library/Logs/CORE ~/Library/Caches/CORE
+```
+
+## Build from source
+
+Requires Xcode command-line tools (`xcode-select --install`).
+
+```bash
+bash build.sh
+```
+
+This compiles the app, installs it to `/Applications`, and creates `CORE.dmg`.
+
+## Troubleshooting
+
+- **Nothing is centred:** check Accessibility permission for CORE, and that the Outlook reminder window title contains "Reminder".
+- **Check the service:** `launchctl list | grep com.core-reminder`
+- **Errors:** `tail -f ~/Library/Logs/CORE/stderr.log`
+- **Restart the service:** `launchctl kickstart -k gui/$(id -u)/com.core-reminder`
+
+## Configuration (advanced)
+
+The service reads these environment variables (set by the app in the LaunchAgent):
 
 | Variable | Default | Description |
 |---|---|---|
-| `OUTLOOK_CHECK_INTERVAL` | `10` | Seconds between each check. Lower = faster detection, higher = less CPU. |
-| `OUTLOOK_MAX_ERRORS` | `10` | Consecutive failures before the daemon exits. |
-| `OUTLOOK_DEBUG` | `0` | Set to `1` to enable debug logging. |
+| `OUTLOOK_CHECK_INTERVAL` | `10` | Seconds between checks |
+| `OUTLOOK_IMMINENT_MINUTES` | `2` | Lead time in minutes (0–30) |
+| `OUTLOOK_MAX_ERRORS` | `10` | Consecutive failures before the service exits |
+| `OUTLOOK_DEBUG` | `0` | `1` enables debug logging |
 
-**Change the check interval** — edit the default in the script:
+## License
 
-```bash
-CHECK_INTERVAL=${OUTLOOK_CHECK_INTERVAL:-10}  # ← change 10 to your preference
-```
+Free for personal, non-commercial use. Copying, forking, redistribution, modification and commercial use are not permitted without written permission. See [LICENSE](LICENSE).
 
-Or override at runtime without editing the file:
-
-```bash
-OUTLOOK_CHECK_INTERVAL=5 bash outlook-reminder-center.sh
-```
-
----
-
-## Logs
-
-Debug logging is **off by default**. Enable it by installing with `--debug` or setting `OUTLOOK_DEBUG=1`.
-
-| File | Contents | When written |
-|---|---|---|
-| `~/Library/Logs/OutlookReminderCenter/debug.log` | Centering events and imminent alerts | Only when debug is enabled |
-| `~/Library/Logs/OutlookReminderCenter/stdout.log` | Standard output | LaunchAgent mode only |
-| `~/Library/Logs/OutlookReminderCenter/stderr.log` | Errors | LaunchAgent mode only |
-
-### Enable debug logging
-
-```bash
-# Reinstall with debug on
-bash outlook-reminder-center.sh install --debug
-
-# Watch live
-tail -f ~/Library/Logs/OutlookReminderCenter/debug.log
-```
-
-### Disable debug logging
-
-```bash
-# Reinstall without --debug
-bash outlook-reminder-center.sh install
-```
-
-Expected debug output when a meeting is imminent:
-```
-[2026-05-15 09:58:02] daemon started — debug log: ...
-[2026-05-15 09:58:10] [alert] IMMINENT — centered: Dev Call (win 12345)
-[2026-05-15 09:58:10] [debug] window text (no match): new event snooze...
-```
-
----
-
-## Debugging & making changes
-
-### Check bash syntax after any edit
-
-```bash
-bash -n outlook-reminder-center.sh && echo "OK"
-```
-
-No output = no syntax errors. Errors include the line number.
-
-### Deeper static analysis (recommended)
-
-```bash
-brew install shellcheck
-shellcheck outlook-reminder-center.sh
-```
-
-### Reload after a code change (no reinstall needed)
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.outlook-reminder-center
-```
-
-### Run in the foreground for interactive testing
-
-```bash
-bash outlook-reminder-center.sh
-```
-
-This prints all log output directly to the terminal. Use Ctrl-C to stop.
-
-### Test the imminent-detection logic manually
-
-Run this in Terminal while a reminder window is open to see exactly what text the script reads:
-
-```bash
-osascript -l JavaScript -e '
-ObjC.import("AppKit");
-function collectText(el, depth) {
-    if (depth > 6) return "";
-    var text = "";
-    try {
-        var kids = el.uiElements();
-        for (var k = 0; k < kids.length; k++) {
-            try {
-                var role = kids[k].role();
-                if (role === "AXStaticText" || role === "AXTextField") {
-                    try { text += " " + kids[k].value(); } catch(ex) {}
-                } else {
-                    text += collectText(kids[k], depth + 1);
-                }
-            } catch(ex) {}
-        }
-    } catch(ex) {}
-    return text;
-}
-var se = Application("System Events");
-var wins = se.processes.whose({name:"Microsoft Outlook"})[0]
-            .windows.whose({name:{_contains:"Reminder"}});
-collectText(wins[0], 0);
-'
-```
-
-The imminence check triggers if the output contains the word `now` or a number ≤ 2 followed by `min`.
-
-### State files (centering cooldown)
-
-Per-window lock files are stored in `/tmp/outlook-reminder-centered/`. Delete them to force a re-center on the next check:
-
-```bash
-rm -rf /tmp/outlook-reminder-centered/
-```
-
-### View the installed plist
-
-```bash
-cat ~/Library/LaunchAgents/com.outlook-reminder-center.plist
-```
-
-### Check all user LaunchAgents
-
-```bash
-launchctl list | grep -v com.apple
-```
-
+Created by Naresh Vasikarla.

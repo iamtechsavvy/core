@@ -13,3 +13,4 @@ memory-bank/**
 openspec/**
 release-builds/**
 .DS_Store
+core.code-workspace

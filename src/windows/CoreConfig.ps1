@@ -83,20 +83,20 @@ function Save-CoreConfig {
     param(
         [int]$Interval,
         [int]$LeadTimeMinutes,
-        [int]$Debug,
+        [int]$DebugLogging,
         [int]$MaxErrors
     )
 
     Assert-InRange -Value $Interval -Min 1 -Max 300 -Name 'Interval'
     Assert-InRange -Value $LeadTimeMinutes -Min 0 -Max 30 -Name 'LeadTimeMinutes'
-    Assert-InRange -Value $Debug -Min 0 -Max 1 -Name 'Debug'
+    Assert-InRange -Value $DebugLogging -Min 0 -Max 1 -Name 'Debug'
     Assert-InRange -Value $MaxErrors -Min 1 -Max 100 -Name 'MaxErrors'
 
     $paths = Get-CorePaths
     [PSCustomObject]@{
         Interval        = $Interval
         LeadTimeMinutes = $LeadTimeMinutes
-        Debug           = $Debug
+        Debug           = $DebugLogging
         MaxErrors       = $MaxErrors
     } | ConvertTo-Json | Set-Content -Path $paths.ConfigPath -Encoding UTF8
 

@@ -83,7 +83,11 @@ function Send-CoreNotification {
 function Get-StateMap {
     $config = Get-CoreConfig
     if (Test-Path $config.Paths.StatePath) {
-        return (Get-Content -Raw -Path $config.Paths.StatePath | ConvertFrom-Json -AsHashtable)
+        # -AsHashtable is PowerShell 7 only; convert manually for 5.1 support.
+        $map = @{}
+        $json = Get-Content -Raw -Path $config.Paths.StatePath | ConvertFrom-Json
+        if ($json) { $json.PSObject.Properties | ForEach-Object { $map[$_.Name] = $_.Value } }
+        return $map
     }
     return @{}
 }
