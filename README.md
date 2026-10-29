@@ -1,6 +1,8 @@
-# CORE — Center Outlook Reminders
+# CORE — Center Outlook Reminders for Mac
 
-CORE is a small macOS menu-bar app that watches for Microsoft Outlook meeting reminders and moves the popup to the centre of your screen when a meeting is starting (or about to), so it can't hide behind other windows. It works across multiple monitors and has no dependencies.
+**Outlook reminder popup hidden behind other windows? Missing meetings because the reminder shows up off-screen or on another monitor?** CORE is a small, free macOS menu-bar app that moves the Microsoft Outlook reminder window to the centre of your screen when a meeting is starting (or about to start), so you actually see it. It works across multiple monitors and has no dependencies.
+
+[**⬇ Download the latest CORE.dmg**](../../releases/latest) · macOS 12+ · Apple Silicon and Intel · free for personal use
 
 > **Windows is not a target.** Windows already has this behaviour built in. The scripts under `src/windows/` are an unsupported, experimental preview and are not part of the release.
 
@@ -96,6 +98,22 @@ The service reads these environment variables (set by the app in the LaunchAgent
 | `OUTLOOK_IMMINENT_MINUTES` | `2` | Lead time in minutes (0–30) |
 | `OUTLOOK_MAX_ERRORS` | `10` | Consecutive failures before the service exits |
 | `OUTLOOK_DEBUG` | `0` | `1` enables debug logging |
+
+## FAQ
+
+**Why does my Outlook reminder window appear behind other windows or on the wrong screen on Mac?**
+Outlook opens the reminder as a separate window that macOS can place behind your current app or on a different display. CORE detects that window and centres it on the screen it appears on.
+
+**Does CORE change my Outlook settings or read my calendar or email?**
+No. It only reads the text of the Outlook "Reminder" window through the macOS Accessibility API to see whether a meeting is starting soon. It makes no network connections.
+
+**When does it move the window?**
+Only when the reminder says "Now" or is within your chosen lead time (0–30 minutes, default 2). Otherwise it leaves the window alone.
+
+**Does it work on Windows?**
+No, and it isn't needed there. Windows already has this behaviour.
+
+---
 
 ## License
 
