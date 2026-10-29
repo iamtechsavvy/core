@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://iamtechsavvy.github.io/core/sitemap.xml

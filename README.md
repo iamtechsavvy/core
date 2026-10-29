@@ -6,6 +6,14 @@
 
 > **Windows is not a target.** Windows already has this behaviour built in. The scripts under `src/windows/` are an unsupported, experimental preview and are not part of the release.
 
+<p align="center">
+  <img src="docs/assets/menu.png" alt="CORE menu-bar menu" width="236">
+  &nbsp;
+  <img src="docs/assets/interval.png" alt="Check Interval dialog" width="292">
+</p>
+
+Website: https://iamtechsavvy.github.io/core/
+
 ---
 
 ## ⚠️ Unsigned app — you must approve it to open it
